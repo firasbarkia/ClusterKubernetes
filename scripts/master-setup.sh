@@ -15,7 +15,6 @@ kubeadm init --apiserver-advertise-address=${MASTER_IP} \
              --apiserver-cert-extra-sans=${MASTER_IP} \
              --pod-network-cidr=${POD_CIDR} \
              --service-cidr=${SERVICE_CIDR} \
-             --kubernetes-version=v${KUBERNETES_VERSION} \
              --ignore-preflight-errors=NumCPU
 
 # Set up kubectl access for root user

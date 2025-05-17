@@ -8,7 +8,6 @@
 MASTER_IP = "192.168.56.10"
 POD_CIDR = "10.244.0.0/16"
 SERVICE_CIDR = "10.96.0.0/12"
-KUBERNETES_VERSION = "1.28.0"  # Updated to use the latest stable version
 DNS_DOMAIN = "cluster.local"
 
 Vagrant.configure("2") do |config|
@@ -31,8 +30,8 @@ Vagrant.configure("2") do |config|
     # Provisioning
     master.vm.provision "file", source: "scripts/common-setup.sh", destination: "/tmp/common-setup.sh"
     master.vm.provision "file", source: "scripts/master-setup.sh", destination: "/tmp/master-setup.sh"
-    master.vm.provision "shell", inline: "chmod +x /tmp/common-setup.sh && /tmp/common-setup.sh #{KUBERNETES_VERSION}"
-    master.vm.provision "shell", inline: "chmod +x /tmp/master-setup.sh && /tmp/master-setup.sh #{MASTER_IP} #{POD_CIDR} #{SERVICE_CIDR} #{KUBERNETES_VERSION}"
+    master.vm.provision "shell", inline: "chmod +x /tmp/common-setup.sh && /tmp/common-setup.sh"
+    master.vm.provision "shell", inline: "chmod +x /tmp/master-setup.sh && /tmp/master-setup.sh #{MASTER_IP} #{POD_CIDR} #{SERVICE_CIDR}"
     
     # Copy admin.conf to shared folder for worker nodes
     master.vm.provision "shell", inline: "cp /etc/kubernetes/admin.conf /vagrant/"
@@ -55,7 +54,7 @@ Vagrant.configure("2") do |config|
       # Provisioning
       worker.vm.provision "file", source: "scripts/common-setup.sh", destination: "/tmp/common-setup.sh"
       worker.vm.provision "file", source: "scripts/worker-setup.sh", destination: "/tmp/worker-setup.sh"
-      worker.vm.provision "shell", inline: "chmod +x /tmp/common-setup.sh && /tmp/common-setup.sh #{KUBERNETES_VERSION}"
+      worker.vm.provision "shell", inline: "chmod +x /tmp/common-setup.sh && /tmp/common-setup.sh"
       worker.vm.provision "shell", inline: "chmod +x /tmp/worker-setup.sh && /tmp/worker-setup.sh"
     end
   end

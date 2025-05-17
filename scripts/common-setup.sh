@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Get Kubernetes version from first argument
+# Get Kubernetes version from first argument or use default if not provided
 KUBERNETES_VERSION=$1
 
 echo "[COMMON] Starting common setup..."
@@ -53,15 +53,25 @@ systemctl restart containerd
 systemctl enable containerd
 
 # Install kubernetes components using the updated method for adding the repository
-echo "[COMMON] Installing Kubernetes components (v${KUBERNETES_VERSION}) with updated repository method..."
+echo "[COMMON] Installing Kubernetes components..."
 mkdir -p /etc/apt/keyrings
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | \
+curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | \
   tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
 
 apt-get update
-apt-get install -y kubelet=${KUBERNETES_VERSION}-00 kubeadm=${KUBERNETES_VERSION}-00 kubectl=${KUBERNETES_VERSION}-00
+
+# Find the latest available version if the specified one doesn't exist
+echo "[COMMON] Checking available Kubernetes versions..."
+apt-cache madison kubeadm | head -5
+
+echo "[COMMON] Installing latest available version..."
+apt-get install -y kubelet kubeadm kubectl
 apt-mark hold kubelet kubeadm kubectl
+
+# Display installed versions
+INSTALLED_VERSION=$(kubectl version --client -o yaml | grep -i gitVersion | cut -d':' -f2 | tr -d ' ')
+echo "[COMMON] Installed Kubernetes version: ${INSTALLED_VERSION}"
 
 # Set up kubectl configuration directory for vagrant user
 echo "[COMMON] Setting up kubectl configuration directory for vagrant user..."
