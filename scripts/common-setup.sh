@@ -52,21 +52,16 @@ containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' 
 systemctl restart containerd
 systemctl enable containerd
 
-# Install kubernetes components using the updated method for adding the repository
+# Install kubernetes components using the new community repository
 echo "[COMMON] Installing Kubernetes components..."
 mkdir -p /etc/apt/keyrings
-curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
-# Use the current distribution codename instead of hardcoded 'xenial'
-DISTRO_CODENAME=$(lsb_release -cs)
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://apt.kubernetes.io/ kubernetes-${DISTRO_CODENAME} main" | \
+# Add the new Kubernetes repository
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /" | \
   tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
 
 apt-get update
-
-# Find the latest available version if the specified one doesn't exist
-echo "[COMMON] Checking available Kubernetes versions..."
-apt-cache madison kubeadm | head -5
 
 # Install specific Kubernetes version
 echo "[COMMON] Installing Kubernetes version: ${KUBERNETES_VERSION}"
