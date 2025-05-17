@@ -5,7 +5,7 @@ set -e
 MASTER_IP=$1
 POD_CIDR=$2
 SERVICE_CIDR=$3
-KUBERNETES_VERSION=$4
+KUBERNETES_VERSION=${4:-1.32.0-00}
 
 echo "[MASTER] Starting master node setup..."
 
@@ -15,6 +15,7 @@ kubeadm init --apiserver-advertise-address=${MASTER_IP} \
              --apiserver-cert-extra-sans=${MASTER_IP} \
              --pod-network-cidr=${POD_CIDR} \
              --service-cidr=${SERVICE_CIDR} \
+             --kubernetes-version=${KUBERNETES_VERSION%-*} \
              --ignore-preflight-errors=NumCPU
 
 # Set up kubectl access for root user
@@ -30,8 +31,8 @@ cp -i /etc/kubernetes/admin.conf /home/vagrant/.kube/config
 chown vagrant:vagrant /home/vagrant/.kube/config
 
 # Install Calico network plugin
-echo "[MASTER] Installing Calico network plugin..."
-kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.25.0/manifests/tigera-operator.yaml
+echo "[MASTER] Installing Calico network plugin (v3.26.0)..."
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.0/manifests/tigera-operator.yaml
 
 cat > calico-custom-resources.yaml <<EOF
 apiVersion: operator.tigera.io/v1
@@ -55,13 +56,14 @@ kubectl create -f calico-custom-resources.yaml
 echo "[MASTER] Waiting for Calico to be ready..."
 kubectl wait --for=condition=ready --timeout=300s pods -l k8s-app=calico-node -n calico-system || true
 
-# Install Kubernetes Dashboard
-echo "[MASTER] Installing Kubernetes Dashboard..."
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+# Install Kubernetes Dashboard if version is specified
+if [ -n "${5}" ]; then
+  echo "[MASTER] Installing Kubernetes Dashboard (v2.7.0)..."
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
 
-# Create admin-user service account
-echo "[MASTER] Creating admin-user service account for Dashboard..."
-cat > dashboard-adminuser.yaml <<EOF
+  # Create admin-user service account
+  echo "[MASTER] Creating admin-user service account for Dashboard..."
+  cat > dashboard-adminuser.yaml <<EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -82,11 +84,12 @@ subjects:
   namespace: kubernetes-dashboard
 EOF
 
-kubectl apply -f dashboard-adminuser.yaml
+  kubectl apply -f dashboard-adminuser.yaml
 
-# Generate and display token for dashboard
-echo "[MASTER] Generating token for Kubernetes Dashboard:"
-kubectl -n kubernetes-dashboard create token admin-user
+  # Generate and display token for dashboard
+  echo "[MASTER] Generating token for Kubernetes Dashboard:"
+  kubectl -n kubernetes-dashboard create token admin-user
+fi
 
 # Generate join command for worker nodes
 echo "[MASTER] Generating join command for worker nodes..."

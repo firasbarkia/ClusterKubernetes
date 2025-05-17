@@ -10,9 +10,14 @@ POD_CIDR = "10.244.0.0/16"
 SERVICE_CIDR = "10.96.0.0/12"
 DNS_DOMAIN = "cluster.local"
 
+# Component versions
+KUBERNETES_VERSION = "1.32.0-00"
+CALICO_VERSION = "3.26.0"
+DASHBOARD_VERSION = "2.7.0" # Set to empty string to skip dashboard installation
+
 Vagrant.configure("2") do |config|
-  # Use Ubuntu 22.04 LTS as base box
-  config.vm.box = "ubuntu/jammy64"
+  # Use Ubuntu 24.04 LTS as base box
+  config.vm.box = "bento/ubuntu-24.04"
   
   # Configure master node
   config.vm.define "controlplane" do |master|
@@ -30,8 +35,8 @@ Vagrant.configure("2") do |config|
     # Provisioning
     master.vm.provision "file", source: "scripts/common-setup.sh", destination: "/tmp/common-setup.sh"
     master.vm.provision "file", source: "scripts/master-setup.sh", destination: "/tmp/master-setup.sh"
-    master.vm.provision "shell", inline: "chmod +x /tmp/common-setup.sh && /tmp/common-setup.sh"
-    master.vm.provision "shell", inline: "chmod +x /tmp/master-setup.sh && /tmp/master-setup.sh #{MASTER_IP} #{POD_CIDR} #{SERVICE_CIDR}"
+    master.vm.provision "shell", inline: "chmod +x /tmp/common-setup.sh && /tmp/common-setup.sh #{KUBERNETES_VERSION}"
+    master.vm.provision "shell", inline: "chmod +x /tmp/master-setup.sh && /tmp/master-setup.sh #{MASTER_IP} #{POD_CIDR} #{SERVICE_CIDR} #{KUBERNETES_VERSION} #{DASHBOARD_VERSION}"
     
     # Copy admin.conf to shared folder for worker nodes
     master.vm.provision "shell", inline: "cp /etc/kubernetes/admin.conf /vagrant/"
@@ -54,7 +59,7 @@ Vagrant.configure("2") do |config|
       # Provisioning
       worker.vm.provision "file", source: "scripts/common-setup.sh", destination: "/tmp/common-setup.sh"
       worker.vm.provision "file", source: "scripts/worker-setup.sh", destination: "/tmp/worker-setup.sh"
-      worker.vm.provision "shell", inline: "chmod +x /tmp/common-setup.sh && /tmp/common-setup.sh"
+      worker.vm.provision "shell", inline: "chmod +x /tmp/common-setup.sh && /tmp/common-setup.sh #{KUBERNETES_VERSION}"
       worker.vm.provision "shell", inline: "chmod +x /tmp/worker-setup.sh && /tmp/worker-setup.sh"
     end
   end

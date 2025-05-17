@@ -2,7 +2,7 @@
 set -e
 
 # Get Kubernetes version from first argument or use default if not provided
-KUBERNETES_VERSION=$1
+KUBERNETES_VERSION=${1:-1.32.0-00}
 
 echo "[COMMON] Starting common setup..."
 
@@ -61,12 +61,9 @@ echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://apt.k
 
 apt-get update
 
-# Find the latest available version if the specified one doesn't exist
-echo "[COMMON] Checking available Kubernetes versions..."
-apt-cache madison kubeadm | head -5
-
-echo "[COMMON] Installing latest available version..."
-apt-get install -y kubelet kubeadm kubectl
+# Install specific Kubernetes version
+echo "[COMMON] Installing Kubernetes version: ${KUBERNETES_VERSION}"
+apt-get install -y kubelet=${KUBERNETES_VERSION} kubeadm=${KUBERNETES_VERSION} kubectl=${KUBERNETES_VERSION}
 apt-mark hold kubelet kubeadm kubectl
 
 # Display installed versions
