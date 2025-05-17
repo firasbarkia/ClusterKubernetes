@@ -31,9 +31,8 @@ cp -i /etc/kubernetes/admin.conf /home/vagrant/.kube/config
 chown vagrant:vagrant /home/vagrant/.kube/config
 
 # Install Calico network plugin
-echo "[MASTER] Installing Calico network plugin (v3.26.0)..."
-kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.0/manifests/tigera-operator.yaml
-
+# Install Calico network plugin
+echo "[MASTER] Installing Calico network plugin (v3.26.0) from Nexus registry..."
 cat > calico-custom-resources.yaml <<EOF
 apiVersion: operator.tigera.io/v1
 kind: Installation
@@ -47,9 +46,12 @@ spec:
       encapsulation: VXLANCrossSubnet
       natOutgoing: Enabled
       nodeSelector: all()
-  registry: docker.io
+  registry: 10.110.10.189:8087
+  imagePullSecrets:
+    - name: nexus-credentials
 EOF
 
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.0/manifests/tigera-operator.yaml
 kubectl create -f calico-custom-resources.yaml
 
 # Wait for Calico to be ready
