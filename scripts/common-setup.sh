@@ -1,63 +1,71 @@
-# -*- mode: ruby -*-
-# vi: set ft=ruby :
+#!/bin/bash
+set -e
 
-# Vagrant configuration for Kubernetes cluster with 1 master and 2 workers
-# Includes Calico networking, kubectl without sudo, and Kubernetes dashboard
+# Get Kubernetes version from first argument
+KUBERNETES_VERSION=$1
 
-# Cluster configuration
-MASTER_IP = "192.168.56.10"
-POD_CIDR = "10.244.0.0/16"
-SERVICE_CIDR = "10.96.0.0/12"
-KUBERNETES_VERSION = "1.28.0"  # Updated to use the latest stable version
-DNS_DOMAIN = "cluster.local"
+echo "[COMMON] Starting common setup..."
 
-Vagrant.configure("2") do |config|
-  # Use Ubuntu 22.04 LTS as base box
-  config.vm.box = "ubuntu/jammy64"
-  config.vm.box_version = "20230607.0.0"
-  
-  # Configure master node
-  config.vm.define "controlplane" do |master|
-    master.vm.hostname = "controlplane"
-    master.vm.network "private_network", ip: MASTER_IP
-    
-    # VM resource configuration
-    master.vm.provider "virtualbox" do |vb|
-      vb.name = "k8s-controlplane"
-      vb.memory = 2048
-      vb.cpus = 3
-      vb.customize ["modifyvm", :id, "--ioapic", "on"]
-    end
-    
-    # Provisioning
-    master.vm.provision "file", source: "scripts/common-setup.sh", destination: "/tmp/common-setup.sh"
-    master.vm.provision "file", source: "scripts/master-setup.sh", destination: "/tmp/master-setup.sh"
-    master.vm.provision "shell", inline: "chmod +x /tmp/common-setup.sh && /tmp/common-setup.sh #{KUBERNETES_VERSION}"
-    master.vm.provision "shell", inline: "chmod +x /tmp/master-setup.sh && /tmp/master-setup.sh #{MASTER_IP} #{POD_CIDR} #{SERVICE_CIDR} #{KUBERNETES_VERSION}"
-    
-    # Copy admin.conf to shared folder for worker nodes
-    master.vm.provision "shell", inline: "cp /etc/kubernetes/admin.conf /vagrant/"
-  end
+# Update system and install required packages
+echo "[COMMON] Updating system and installing required packages..."
+apt-get update
+apt-get install -y apt-transport-https ca-certificates curl software-properties-common gnupg2
 
-  # Configure worker nodes
-  (1..2).each do |i|
-    config.vm.define "worker-#{i}" do |worker|
-      worker.vm.hostname = "worker-#{i}"
-      worker.vm.network "private_network", ip: "192.168.56.#{i + 10}"
-      
-      # VM resource configuration
-      worker.vm.provider "virtualbox" do |vb|
-        vb.name = "k8s-worker-#{i}"
-        vb.memory = 4096
-        vb.cpus = 1
-        vb.customize ["modifyvm", :id, "--ioapic", "on"]
-      end
-      
-      # Provisioning
-      worker.vm.provision "file", source: "scripts/common-setup.sh", destination: "/tmp/common-setup.sh"
-      worker.vm.provision "file", source: "scripts/worker-setup.sh", destination: "/tmp/worker-setup.sh"
-      worker.vm.provision "shell", inline: "chmod +x /tmp/common-setup.sh && /tmp/common-setup.sh #{KUBERNETES_VERSION}"
-      worker.vm.provision "shell", inline: "chmod +x /tmp/worker-setup.sh && /tmp/worker-setup.sh"
-    end
-  end
-end
+# Disable swap
+echo "[COMMON] Disabling swap..."
+swapoff -a
+sed -i '/swap/d' /etc/fstab
+
+# Load required modules
+echo "[COMMON] Loading required kernel modules..."
+cat > /etc/modules-load.d/k8s.conf <<EOF
+overlay
+br_netfilter
+EOF
+modprobe overlay
+modprobe br_netfilter
+
+# Set up kernel parameters
+echo "[COMMON] Setting up kernel parameters..."
+cat > /etc/sysctl.d/k8s.conf <<EOF
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+sysctl --system
+
+# Install containerd using the updated method for adding the repository
+echo "[COMMON] Installing containerd with updated repository method..."
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
+  tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+apt-get update && apt-get install -y containerd.io
+
+# Configure containerd to use systemd cgroup driver
+echo "[COMMON] Configuring containerd with systemd cgroup driver..."
+mkdir -p /etc/containerd
+containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' > /etc/containerd/config.toml
+systemctl restart containerd
+systemctl enable containerd
+
+# Install kubernetes components using the updated method for adding the repository
+echo "[COMMON] Installing Kubernetes components (v${KUBERNETES_VERSION}) with updated repository method..."
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | \
+  tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
+
+apt-get update
+apt-get install -y kubelet=${KUBERNETES_VERSION}-00 kubeadm=${KUBERNETES_VERSION}-00 kubectl=${KUBERNETES_VERSION}-00
+apt-mark hold kubelet kubeadm kubectl
+
+# Set up kubectl configuration directory for vagrant user
+echo "[COMMON] Setting up kubectl configuration directory for vagrant user..."
+mkdir -p /home/vagrant/.kube
+chown -R vagrant:vagrant /home/vagrant/.kube
+
+echo "[COMMON] Common setup completed successfully!"

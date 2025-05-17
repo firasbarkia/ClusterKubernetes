@@ -8,7 +8,7 @@
 MASTER_IP = "192.168.56.10"
 POD_CIDR = "10.244.0.0/16"
 SERVICE_CIDR = "10.96.0.0/12"
-KUBERNETES_VERSION = "1.26.1"
+KUBERNETES_VERSION = "1.28.0"  # Updated to use the latest stable version
 DNS_DOMAIN = "cluster.local"
 
 Vagrant.configure("2") do |config|
