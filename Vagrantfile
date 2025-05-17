@@ -12,7 +12,9 @@ KUBERNETES_VERSION = "1.28.0"  # Updated to use the latest stable version
 DNS_DOMAIN = "cluster.local"
 
 Vagrant.configure("2") do |config|
+  # Use Ubuntu 22.04 LTS as base box
   config.vm.box = "ubuntu/jammy64"
+  config.vm.box_version = "20230607.0.0"
   
   # Configure master node
   config.vm.define "controlplane" do |master|
