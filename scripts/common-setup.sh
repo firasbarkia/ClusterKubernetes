@@ -56,14 +56,26 @@ systemctl enable containerd
 echo "[COMMON] Installing Kubernetes components..."
 mkdir -p /etc/apt/keyrings
 curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | \
+
+# Use the current distribution codename instead of hardcoded 'xenial'
+DISTRO_CODENAME=$(lsb_release -cs)
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://apt.kubernetes.io/ kubernetes-${DISTRO_CODENAME} main" | \
   tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
 
 apt-get update
 
+# Find the latest available version if the specified one doesn't exist
+echo "[COMMON] Checking available Kubernetes versions..."
+apt-cache madison kubeadm | head -5
+
 # Install specific Kubernetes version
 echo "[COMMON] Installing Kubernetes version: ${KUBERNETES_VERSION}"
-apt-get install -y kubelet=${KUBERNETES_VERSION} kubeadm=${KUBERNETES_VERSION} kubectl=${KUBERNETES_VERSION}
+if ! apt-get install -y kubelet=${KUBERNETES_VERSION} kubeadm=${KUBERNETES_VERSION} kubectl=${KUBERNETES_VERSION}; then
+  echo "[WARNING] Failed to install exact version ${KUBERNETES_VERSION}, trying to find available version..."
+  LATEST_VERSION=$(apt-cache madison kubeadm | head -1 | awk '{print $3}')
+  echo "[INFO] Installing latest available version: ${LATEST_VERSION}"
+  apt-get install -y kubelet=${LATEST_VERSION} kubeadm=${LATEST_VERSION} kubectl=${LATEST_VERSION}
+fi
 apt-mark hold kubelet kubeadm kubectl
 
 # Display installed versions
